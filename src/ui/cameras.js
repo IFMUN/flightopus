@@ -38,11 +38,11 @@ export class CameraRig {
       desired.copy(fm.pos).addScaledVector(fwd, -55).addScaledVector(up, 13)
       cam.position.lerp(desired, k)
       cam.lookAt(fm.pos.clone().addScaledVector(fwd, 35))
-    } else if (this.mode === 1) { // cockpit
-      desired.copy(fm.pos).addScaledVector(fwd, 16.5).addScaledVector(up, 1.4)
-      cam.position.lerp(desired, 1 - Math.exp(-dt * 18))
+    } else if (this.mode === 1) { // cockpit / forward nose view (rolls with the jet)
+      desired.copy(fm.pos).addScaledVector(fwd, 24).addScaledVector(up, 0.6)
+      cam.position.lerp(desired, 1 - Math.exp(-dt * 22))
       cam.up.copy(up)
-      cam.lookAt(fm.pos.clone().addScaledVector(fwd, 120).addScaledVector(up, -2))
+      cam.lookAt(fm.pos.clone().addScaledVector(fwd, 240).addScaledVector(up, -8))
     } else if (this.mode === 2) { // wing
       desired.copy(fm.pos).addScaledVector(rgt, 38).addScaledVector(up, 4).addScaledVector(fwd, -4)
       cam.position.lerp(desired, k)

@@ -68,10 +68,10 @@ async function main () {
     })
     page.on('pageerror', e => errors.push('PAGEERROR: ' + e.message))
 
-    await page.goto(url, { waitUntil: 'domcontentloaded' })
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 })
 
-    // wait for first render
-    await page.waitForFunction(() => window.__ready === true, { timeout: 45000 }).catch(() => {})
+    // wait for first render (high quality can take a while under SwiftShader)
+    await page.waitForFunction(() => window.__ready === true, { timeout: 120000 }).catch(() => {})
 
     async function press (spec) {
       // "g:500" press g wait 500 ; "ArrowUp:hold:2000" hold for 2000ms
@@ -102,13 +102,13 @@ async function main () {
       let prev = 0
       for (let i = 0; i < shots.length; i++) {
         await page.waitForTimeout(Math.max(0, shots[i] - prev)); prev = shots[i]
-        await page.screenshot({ path: resolve(SHOTS, `${name}-${i}.png`) })
+        await page.screenshot({ path: resolve(SHOTS, `${name}-${i}.png`), timeout: 120000 })
         console.log('saved', `${name}-${i}.png`, 'at', shots[i] + 'ms')
       }
     } else {
       await page.waitForTimeout(waitMs)
       if (keys) { for (const k of keys.split(',')) await press(k.trim()) }
-      await page.screenshot({ path: resolve(SHOTS, `${name}.png`) })
+      await page.screenshot({ path: resolve(SHOTS, `${name}.png`), timeout: 120000 })
       console.log('saved', `${name}.png`)
     }
 
