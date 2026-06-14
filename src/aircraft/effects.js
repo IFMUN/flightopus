@@ -87,6 +87,42 @@ export class FireSmoke {
   }
 }
 
+// Smoke that streams from a moving world point (a damaged part), leaving a
+// trail behind the aircraft.
+export class TrailSmoke {
+  constructor (scene, { color = 0x1d1d1d, size = 13, n = 64 } = {}) {
+    this.scene = scene; this.n = n
+    this.pos = new Float32Array(n * 3); this.life = new Float32Array(n)
+    for (let i = 0; i < n; i++) this.life[i] = Math.random()
+    this.geo = new THREE.BufferGeometry()
+    this.geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3))
+    this.mat = new THREE.PointsMaterial({ map: smokeTex, size, transparent: true, opacity: 0.5, depthWrite: false, color })
+    this.points = new THREE.Points(this.geo, this.mat)
+    this.points.frustumCulled = false
+    scene.add(this.points)
+  }
+
+  update (dt, src, wind) {
+    const wx = wind ? wind.x : 0, wz = wind ? wind.z : 0
+    for (let i = 0; i < this.n; i++) {
+      this.life[i] -= dt * 0.55
+      if (this.life[i] <= 0) {
+        this.life[i] = 1
+        this.pos[i * 3] = src.x + (Math.random() - 0.5) * 2.5
+        this.pos[i * 3 + 1] = src.y + (Math.random() - 0.5) * 2.5
+        this.pos[i * 3 + 2] = src.z + (Math.random() - 0.5) * 2.5
+      } else {
+        this.pos[i * 3] += wx * 0.3 * dt
+        this.pos[i * 3 + 1] += dt * 9
+        this.pos[i * 3 + 2] += wz * 0.3 * dt
+      }
+    }
+    this.geo.attributes.position.needsUpdate = true
+  }
+
+  dispose () { this.scene.remove(this.points); this.geo.dispose(); this.mat.dispose() }
+}
+
 export function makeBlobShadow () {
   const tex = makeGlow('rgba(0,0,0,0.55)', 'rgba(0,0,0,0.0)')
   const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.5, color: 0x000000 })

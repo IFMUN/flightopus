@@ -20,9 +20,9 @@ const P = {
   CL0: 0.12, CLa: 5.4, aStall: 16 * D2R, dCLflap: 0.95,
   CD0: 0.021, kInd: 0.045, dCDflap: 0.030, gearCD: 0.018, spoilCD: 0.07,
   // moments — Cm0 sets the hands-off trim AoA (~5°) for level cruise
-  Cm0: 0.077, Cma: -0.9, Cmde: 0.05, Cmq: -26,
-  Clda: 0.06, Clp: -0.6,
-  Cnb: 0.11, Cndr: -0.09, Cnr: -0.42, CYb: -0.95, CYdr: 0.12,
+  Cm0: 0.077, Cma: -0.9, Cmde: 0.11, Cmq: -26,
+  Clda: 0.085, Clp: -0.6,
+  Cnb: 0.11, Cndr: -0.10, Cnr: -0.42, CYb: -0.95, CYdr: 0.12,
   gearH: 3.7,          // CG height above wheels, gear down (m)
   bellyH: 1.7          // clearance from CG to lowest structure
 }
@@ -52,6 +52,19 @@ export class FlightModel {
     this.stall = false
     this._wasAir = true
     this.touchdownSink = 0
+    this.damage = { nose: 0, wingL: 0, wingR: 0, engineL: 0, engineR: 0, tail: 0 }
+    this._buffet = new THREE.Vector3()
+  }
+
+  applyDamage (part, amt) {
+    if (this.damage[part] === undefined) return
+    this.damage[part] = THREE.MathUtils.clamp(this.damage[part] + amt, 0, 1)
+  }
+
+  overallDamage () {
+    const d = this.damage
+    return THREE.MathUtils.clamp(
+      (d.nose * 0.5 + d.wingL + d.wingR + d.engineL * 0.8 + d.engineR * 0.8 + d.tail * 1.2) / 4.5, 0, 1)
   }
 
   // body basis
@@ -97,7 +110,11 @@ export class FlightModel {
     const spoiler = input.spoiler || 0
     let CD = P.CD0 + P.kInd * CL * CL + flap * P.dCDflap + spoiler * P.spoilCD
     if (input.gearDown) CD += P.gearCD
-    const Lift = qd * P.S * CL
+    // battle damage degrades the airframe
+    const d = this.damage
+    const liftDmg = 1 - 0.45 * (d.wingL + d.wingR) * 0.5
+    CD += (d.wingL + d.wingR) * 0.012 + d.nose * 0.01
+    const Lift = qd * P.S * CL * liftDmg
     const Drag = qd * P.S * CD
     const Side = qd * P.S * (P.CYb * beta + P.CYdr * (input.yaw || 0))
 
@@ -109,7 +126,8 @@ export class FlightModel {
     let liftDir = new THREE.Vector3().crossVectors(rgt, airDir).normalize()
     if (liftDir.dot(this.up(tmpV)) < 0) liftDir.multiplyScalar(-1)
 
-    const thrust = (input.throttle || 0) * P.Tmax
+    const engPow = Math.max(0, 1 - 0.5 * d.engineL - 0.5 * d.engineR)
+    const thrust = (input.throttle || 0) * P.Tmax * engPow
     const F = new THREE.Vector3(0, -9.81 * P.m, 0)
     F.addScaledVector(fwd, thrust)
     F.addScaledVector(dragDir, Drag)
@@ -124,9 +142,11 @@ export class FlightModel {
     // --- moments / rotation ---
     const adim = P.c / (2 * Vh)
     const bdim = P.b / (2 * Vh)
-    const pitchM = qd * P.S * P.c * (P.Cm0 + P.Cma * alpha + P.Cmde * (input.pitch || 0) + P.Cmq * this.omega.x * adim)
-    const rollM = qd * P.S * P.b * (P.Clda * (input.roll || 0) + P.Clp * this.omega.z * bdim)
-    const yawM = qd * P.S * P.b * (P.Cnb * beta + P.Cndr * (input.yaw || 0) + P.Cnr * this.omega.y * bdim)
+    // tail damage cuts pitch/yaw control and adds a relentless nose-down pull
+    const tailEff = 1 - 0.8 * d.tail
+    const pitchM = qd * P.S * P.c * (P.Cm0 + P.Cma * alpha + P.Cmde * (input.pitch || 0) * tailEff + P.Cmq * this.omega.x * adim - 0.07 * d.tail)
+    const rollM = qd * P.S * P.b * (P.Clda * (input.roll || 0) + P.Clp * this.omega.z * bdim + (d.wingR - d.wingL) * 0.06)
+    const yawM = qd * P.S * P.b * (P.Cnb * beta + P.Cndr * (input.yaw || 0) * tailEff + P.Cnr * this.omega.y * bdim + (d.engineR - d.engineL) * 0.05)
     this.omega.x += (pitchM / P.Ipitch) * dt
     this.omega.y += (yawM / P.Iyaw) * dt
     this.omega.z += (rollM / P.Iroll) * dt
@@ -140,6 +160,18 @@ export class FlightModel {
       // gentle phugoid damping (opposes sustained climb/sink) when hands-off pitch
       if (Math.abs(input.pitch || 0) < 0.05) {
         this.omega.x += (-this.vel.y * 0.0010 - this.omega.x * 0.9) * dt
+        // ground-proximity assist: ease the nose up when low & sinking hands-off
+        const agl = this.pos.y - this.hf.height(this.pos.x, this.pos.z)
+        if (agl < 260 && this.vel.y < -1) {
+          this.omega.x += (0.32 - this.omega.x) * Math.min(1, dt * 1.4) * (1 - agl / 260)
+        }
+      }
+      // structural buffeting scales with battle damage
+      const od = this.overallDamage()
+      if (od > 0.04) {
+        this.omega.x += (Math.random() - 0.5) * od * 0.5 * dt
+        this.omega.y += (Math.random() - 0.5) * od * 0.4 * dt
+        this.omega.z += (Math.random() - 0.5) * od * 0.9 * dt
       }
     }
 
@@ -284,7 +316,8 @@ export class FlightModel {
       g: this.gLoad,
       stall: this.stall,
       onGround: this.onGround,
-      dead: this.dead, crashed: this.crashed
+      dead: this.dead, crashed: this.crashed,
+      damage: this.damage, overallDamage: this.overallDamage()
     }
   }
 }
