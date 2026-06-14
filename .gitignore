@@ -1,0 +1,6 @@
+node_modules
+dist
+.vite
+tools/shots
+*.log
+.DS_Store
