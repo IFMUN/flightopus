@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>FLIGHTOPUS — Yosemite Flight</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <!-- SVG filters that make the glass UI actually bend the light behind it -->
+  <svg class="svg-defs" aria-hidden="true">
+    <defs>
+      <filter id="liquidGlass" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.009 0.013" numOctaves="2" seed="11" result="noise">
+          <animate attributeName="baseFrequency" dur="22s"
+                   values="0.009 0.013; 0.013 0.010; 0.008 0.014; 0.009 0.013" repeatCount="indefinite" />
+        </feTurbulence>
+        <feGaussianBlur in="noise" stdDeviation="1.1" result="snoise" />
+        <feDisplacementMap in="SourceGraphic" in2="snoise" scale="26"
+                           xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+      <filter id="liquidGlassStrong" x="-40%" y="-40%" width="180%" height="180%" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.006 0.010" numOctaves="3" seed="4" result="noise">
+          <animate attributeName="baseFrequency" dur="14s"
+                   values="0.006 0.010; 0.011 0.007; 0.006 0.010" repeatCount="indefinite" />
+        </feTurbulence>
+        <feGaussianBlur in="noise" stdDeviation="0.8" result="snoise" />
+        <feDisplacementMap in="SourceGraphic" in2="snoise" scale="46"
+                           xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </defs>
+  </svg>
+
+  <div id="scene"></div>
+
+  <!-- HUD (built/managed in JS) -->
+  <div id="hud" class="hud hidden"></div>
+
+  <!-- Homepage / intro (built/managed in JS) -->
+  <div id="home" class="home"></div>
+
+  <!-- Cinematic transition veil -->
+  <div id="veil" class="veil"></div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

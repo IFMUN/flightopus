@@ -1,0 +1,34 @@
+{
+  "source": {
+    "elevation": "AWS Terrain Tiles (Terrarium RGB)",
+    "satellite": null
+  },
+  "bbox": {
+    "west": -119.70703125,
+    "east": -119.4873046875,
+    "north": 37.78808138412047,
+    "south": 37.68382032669383
+  },
+  "satBbox": {
+    "west": -119.70703125,
+    "east": -119.50927734375,
+    "north": 37.78808138412047,
+    "south": 37.68382032669383
+  },
+  "elevZoom": 13,
+  "satZoom": 14,
+  "heightmap": {
+    "width": 1280,
+    "height": 768
+  },
+  "widthMeters": 19368.13595412516,
+  "heightMeters": 11572.194007622513,
+  "mPerDegLat": 110992.4864877269,
+  "mPerDegLon": 88146.5387423296,
+  "decode": {
+    "scaleR": 256,
+    "scaleG": 1,
+    "scaleB": 0.00390625,
+    "offset": -32768
+  }
+}
