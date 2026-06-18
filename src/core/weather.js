@@ -45,8 +45,9 @@ export class Weather {
     this._boltMeshes = []
     // bright blue-white core shared by all bolt segments
     this._boltMat = new THREE.MeshBasicMaterial({ color: 0xeaf3ff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })
-    // additive impact flash sprite at the plane
-    this._impactMat = new THREE.SpriteMaterial({ color: 0xcfe6ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })
+    // additive impact flash sprite at the plane (soft round glow)
+    this._impactTex = makeFlashTex()
+    this._impactMat = new THREE.SpriteMaterial({ map: this._impactTex, color: 0xdfeeff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })
     this._impact = new THREE.Sprite(this._impactMat)
     this._impact.visible = false
     this.scene.add(this._impact)
@@ -349,4 +350,17 @@ export class Weather {
     this.auroraGroup.visible = false
     this.scene.add(this.auroraGroup)
   }
+}
+
+// soft round flash sprite for the lightning impact burst
+function makeFlashTex () {
+  const s = 128, cv = document.createElement('canvas'); cv.width = cv.height = s
+  const ctx = cv.getContext('2d')
+  const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2)
+  g.addColorStop(0, 'rgba(255,255,255,1)')
+  g.addColorStop(0.25, 'rgba(220,238,255,0.9)')
+  g.addColorStop(0.6, 'rgba(150,200,255,0.35)')
+  g.addColorStop(1, 'rgba(120,170,255,0)')
+  ctx.fillStyle = g; ctx.fillRect(0, 0, s, s)
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t
 }
