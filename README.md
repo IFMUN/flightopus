@@ -32,6 +32,12 @@ behind you for the next attempt.
 - **Five times of day** — Dawn, Midday, Golden Hour, Dusk, Night (with stars and
   a moon) — and **dynamic weather**: clear, cloudy, rain, snow, storm with
   hurricane-force winds and lightning, and northern-lights aurora.
+- **Storm lightning that strikes the jet.** In a storm, bolts can hit the
+  aircraft and damage a wing, engine, tail or the nose — degrading thrust, lift
+  and control. Damage shows as a **corner airframe schematic** (the hit part
+  lights up), a **red edge vignette** that intensifies and pulses as it worsens,
+  scorched parts trailing smoke, and a relentless **nose-down pull** from tail
+  damage that you have to fight all the way down.
 - **Every attempt persists.** Crash and the burning wreckage stays. Land and the
   jet stays parked. Press Space for a fresh aircraft and fly on while your past
   runs — and their flight trails — remain in the valley.

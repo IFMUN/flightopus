@@ -49,8 +49,9 @@ export class DamageUI {
     }
     const integ = Math.round((1 - overall) * 100)
     this.bar.style.width = integ + '%'
+    this.bar.style.background = lerp3(overall, [98, 224, 138], [255, 209, 102], [255, 90, 68])
     this.pct.textContent = integ
-    this.vig.style.opacity = Math.min(0.92, overall * 1.25)
+    this.vig.style.opacity = any ? Math.min(0.95, 0.18 + overall * 1.4) : 0
     this.vig.classList.toggle('crit', overall > 0.5)
   }
 
@@ -66,11 +67,13 @@ export class DamageUI {
 function el (tag, cls) { const e = document.createElement(tag); e.className = cls; return e }
 
 // steel -> amber -> red as damage rises
-function mix (l) {
-  const stops = [[90, 100, 112], [255, 190, 70], [255, 40, 38]]
-  const t = Math.max(0, Math.min(1, l))
-  let a, b, f
-  if (t < 0.5) { a = stops[0]; b = stops[1]; f = t / 0.5 } else { a = stops[1]; b = stops[2]; f = (t - 0.5) / 0.5 }
-  const c = a.map((v, i) => Math.round(v + (b[i] - v) * f))
-  return `rgb(${c[0]},${c[1]},${c[2]})`
+function mix (l) { return lerp3(l, [90, 100, 112], [255, 190, 70], [255, 40, 38]) }
+
+// 3-stop colour ramp a(0) -> b(0.5) -> c(1)
+function lerp3 (t, a, b, c) {
+  t = Math.max(0, Math.min(1, t))
+  let x, y, f
+  if (t < 0.5) { x = a; y = b; f = t / 0.5 } else { x = b; y = c; f = (t - 0.5) / 0.5 }
+  const r = x.map((v, i) => Math.round(v + (y[i] - v) * f))
+  return `rgb(${r[0]},${r[1]},${r[2]})`
 }
