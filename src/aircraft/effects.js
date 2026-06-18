@@ -90,13 +90,13 @@ export class FireSmoke {
 // Smoke that streams from a moving world point (a damaged part), leaving a
 // trail behind the aircraft.
 export class TrailSmoke {
-  constructor (scene, { color = 0x1d1d1d, size = 13, n = 64 } = {}) {
+  constructor (scene, { color = 0x1d1d1d, size = 9, n = 46 } = {}) {
     this.scene = scene; this.n = n
     this.pos = new Float32Array(n * 3); this.life = new Float32Array(n)
     for (let i = 0; i < n; i++) this.life[i] = Math.random()
     this.geo = new THREE.BufferGeometry()
     this.geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3))
-    this.mat = new THREE.PointsMaterial({ map: smokeTex, size, transparent: true, opacity: 0.5, depthWrite: false, color })
+    this.mat = new THREE.PointsMaterial({ map: smokeTex, size, transparent: true, opacity: 0.42, depthWrite: false, color })
     this.points = new THREE.Points(this.geo, this.mat)
     this.points.frustumCulled = false
     scene.add(this.points)

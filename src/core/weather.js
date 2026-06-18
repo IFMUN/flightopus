@@ -37,8 +37,15 @@ export class Weather {
     this._buildClouds()
     this._buildPrecip()
     this._buildAurora()
+    // lightning strikes
+    this.onStrike = null
+    this.target = null
+    this._boltT = 0
+    this._boltMat = new THREE.MeshBasicMaterial({ color: 0xcfe6ff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })
     this.setWeather(CONFIG.initialWeather || 'clear')
   }
+
+  setTarget (fm) { this.target = fm }
 
   // ---- wind field read by the flight model ----
   getWind (pos, t) {
@@ -100,10 +107,42 @@ export class Weather {
     if (this.preset.lightning) {
       this._lightT -= dt
       if (this._lightT <= 0) {
-        this._lightT = 2.5 + Math.random() * 6
+        this._lightT = 1.8 + Math.random() * 4.0
         this.env.flash(0.9 + Math.random() * 0.6)
+        // a strike sometimes finds the exposed jet
+        if (this.target && !this.target.onGround && !this.target.dead && Math.random() < 0.5) this._strikePlane()
       }
     }
+    if (this._boltT > 0) {
+      this._boltT -= dt
+      if (this._boltMesh) this._boltMesh.material.opacity = Math.max(0, this._boltT / 0.16) * 0.95
+      if (this._boltT <= 0 && this._boltMesh) { this.scene.remove(this._boltMesh); this._boltMesh.geometry.dispose(); this._boltMesh = null }
+    }
+  }
+
+  _strikePlane () {
+    const p = this.target.pos
+    const n = 11
+    const pts = []
+    const topx = p.x + (Math.random() - 0.5) * 220
+    const topz = p.z + (Math.random() - 0.5) * 220
+    for (let i = 0; i <= n; i++) {
+      const f = i / n
+      const jit = (i > 0 && i < n) ? (1 - f) * 130 : 0
+      pts.push(new THREE.Vector3(
+        THREE.MathUtils.lerp(topx, p.x, f) + (Math.random() - 0.5) * jit,
+        THREE.MathUtils.lerp(p.y + 1600, p.y, f),
+        THREE.MathUtils.lerp(topz, p.z, f) + (Math.random() - 0.5) * jit))
+    }
+    if (this._boltMesh) { this.scene.remove(this._boltMesh); this._boltMesh.geometry.dispose() }
+    const curve = new THREE.CatmullRomCurve3(pts)
+    const geo = new THREE.TubeGeometry(curve, 44, 2.6, 6, false)
+    this._boltMesh = new THREE.Mesh(geo, this._boltMat)
+    this._boltMesh.frustumCulled = false
+    this.scene.add(this._boltMesh)
+    this._boltT = 0.16
+    this.env.flash(1.5)
+    this.onStrike?.()
   }
 
   // ---- clouds ----

@@ -16,7 +16,7 @@ import { dirname, resolve } from 'node:path'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(__dirname, '..')
 const SHOTS = resolve(__dirname, 'shots')
-const PORT = 5191
+const PORT = parseInt(process.env.SHOT_PORT || '5191', 10)
 
 function arg (name, def) {
   const i = process.argv.indexOf('--' + name)

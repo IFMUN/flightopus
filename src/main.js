@@ -12,6 +12,8 @@ import { Attempts } from './aircraft/attempts.js'
 import { HUD } from './ui/hud.js'
 import { Homepage } from './ui/homepage.js'
 import { CameraRig } from './ui/cameras.js'
+import { DamageUI } from './ui/damage.js'
+import { TrailSmoke } from './aircraft/effects.js'
 
 const app = {}
 window.__app = app
@@ -24,8 +26,10 @@ const spectator = !!camMode
 
 function spawnState () {
   return {
-    pos: new THREE.Vector3(-6000, 2350, 1400),
-    vel: new THREE.Vector3(150, 0, 0),                                   // east, down-valley
+    // start high and clear of every peak (terrain max ~3027 m) heading east
+    // down the valley, so hands-off flight never flies into a mountain
+    pos: new THREE.Vector3(-5200, 3250, 900),
+    vel: new THREE.Vector3(150, 0, 0),
     quat: new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -Math.PI / 2, 0, 'YXZ'))
   }
 }
@@ -84,7 +88,34 @@ async function boot () {
   attempts.spawn(spawnState())
   const cameras = new CameraRig(camera)
   const hud = new HUD(document.getElementById('hud'))
-  Object.assign(app, { attempts, cameras, hud })
+  const damageUI = new DamageUI()
+  Object.assign(app, { attempts, cameras, hud, damageUI })
+
+  // ---- lightning damage ----
+  const partSmokes = new Map()
+  const tmpV3 = new THREE.Vector3()
+  weather.setTarget(attempts.fm)
+  weather.onStrike = () => onLightningStrike()
+
+  const STRIKE_PARTS = [
+    ['wingL', 'Left wing'], ['wingR', 'Right wing'],
+    ['engineL', 'Left engine'], ['engineR', 'Right engine'],
+    ['tail', 'Tail'], ['nose', 'Nose']
+  ]
+  function onLightningStrike () {
+    if (!started || app.paused || attempts.fm.dead) return
+    // bias toward wings/engines, rarely the nose
+    const [part, label] = STRIKE_PARTS[Math.floor(Math.pow(Math.random(), 1.3) * STRIKE_PARTS.length) % STRIKE_PARTS.length]
+    attempts.fm.applyDamage(part, 0.22 + Math.random() * 0.3)
+    damageUI.strike()
+    hud.toast('⚡ LIGHTNING STRIKE', label + ' damaged — fly it down!', 'danger')
+    if (!partSmokes.has(part)) partSmokes.set(part, new TrailSmoke(scene, { color: 0x151515 }))
+  }
+  function clearDamageFx () {
+    for (const s of partSmokes.values()) s.dispose()
+    partSmokes.clear()
+    damageUI.reset()
+  }
 
   let timeIdx = TIME_ORDER.indexOf(env.timeName); if (timeIdx < 0) timeIdx = 2
   let gearAnim = 0
@@ -104,7 +135,7 @@ async function boot () {
   cameras.snapBehind(attempts.fm)
 
   function resetCruise () {
-    controls.setGear(false); controls.setThrottle(0.30); controls.setFlaps(0)
+    controls.setGear(false); controls.setThrottle(0.34); controls.setFlaps(0)
     controls.input.pitch = controls.input.roll = controls.input.yaw = 0
     gearAnim = 0
   }
@@ -113,6 +144,7 @@ async function boot () {
   function newAttempt () {
     const n = attempts.newAttempt()
     resetCruise()
+    clearDamageFx()
     cameras.snapBehind(attempts.fm)
     hud.setAttempt(n + 1)
     hud.toast('New attempt #' + (n + 1), 'Your past runs remain in the valley', '')
@@ -153,6 +185,11 @@ async function boot () {
     f.quat.copy(spawnState().quat); f.omega.set(0, 0, 0)
     controls.setGear(true); controls.setThrottle(0.10); controls.setFlaps(3)
   }
+  app.testStrike = (part = 'wingR', amt = 0.45) => {
+    attempts.fm.applyDamage(part, amt); damageUI.strike()
+    if (!partSmokes.has(part)) partSmokes.set(part, new TrailSmoke(scene, { color: 0x151515 }))
+    hud.toast('⚡ LIGHTNING STRIKE', part + ' damaged', 'danger')
+  }
   if (CONFIG.skipIntro && !spectator) startGameplay()
   if (!CONFIG.skipIntro) { home.ready() }
 
@@ -189,6 +226,14 @@ async function boot () {
       const T = attempts.fm.telemetry()
       hud.update(T, input, { flapNotch: controls.flapNotch, gearMoving: Math.abs((input.gearDown ? 1 : 0) - gearAnim) > 0.02 })
       hud.setWind(weather.windSpeed() * 1.94384)
+
+      // battle-damage visuals: scorch parts, fill the schematic, trail smoke
+      damageUI.setDamage(attempts.fm.damage, T.overallDamage)
+      if (T.overallDamage > 0.001) {
+        const dmg = attempts.fm.damage
+        if (p.setPartDamage) for (const k in dmg) p.setPartDamage(k, dmg[k])
+        if (p.parts) for (const [part, smoke] of partSmokes) { const loc = p.parts[part]; if (loc) smoke.update(dt, loc.getWorldPosition(tmpV3), wind) }
+      }
 
       if (DEBUG && (telT += dt) > 0.5) {
         telT = 0
