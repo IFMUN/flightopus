@@ -27,7 +27,12 @@ export class Homepage {
           <span class="spec"><b>266k</b> trees</span>
           <span class="spec"><b>1047–3027 m</b> real terrain</span>
         </div>
-        <div style="margin-top:26px">
+        <div class="modeseg" id="modeseg">
+          <div class="seg-label">Controls</div>
+          <button class="seg active" data-mode="cursor">🖱 Cursor — easy (point where to fly)</button>
+          <button class="seg" data-mode="keyboard">⌨ Keyboard — full control</button>
+        </div>
+        <div style="margin-top:18px">
           <button class="enter glass" id="enter-btn" disabled>Loading…</button>
         </div>
         <div class="loadbar"><i id="load-i"></i></div>
@@ -35,6 +40,12 @@ export class Homepage {
       </div>
       <div class="foot">Keyboard flight · Shift/Ctrl throttle · G gear · F/R flaps · H for help</div>
     `
+    this.controlMode = 'cursor'
+    this.root.querySelectorAll('.modeseg .seg').forEach(b => b.addEventListener('click', () => {
+      this.root.querySelectorAll('.modeseg .seg').forEach(x => x.classList.remove('active'))
+      b.classList.add('active')
+      this.controlMode = b.dataset.mode
+    }))
     this.btn = this.root.querySelector('#enter-btn')
     this.loadI = this.root.querySelector('#load-i')
     this.loadT = this.root.querySelector('#load-t')

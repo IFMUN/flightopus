@@ -244,3 +244,43 @@ html, body {
 .dmg-bar > i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #ff5a44, #ffd166 55%, #62e08a); transition: width .3s ease; }
 .dmg-int { font-size: 10px; letter-spacing: .5px; opacity: .7; text-align: center; margin-top: 5px; font-variant-numeric: tabular-nums; }
 
+/* ----------------------------------------------------------------------------
+   Cursor steering — reticle (target) + boresight (flight datum)
+---------------------------------------------------------------------------- */
+.reticle, .boresight { position: fixed; pointer-events: none; z-index: 13; display: none; }
+body.cursor-steer .reticle, body.cursor-steer .boresight { display: block; }
+body.cursor-steer, body.cursor-steer #scene canvas { cursor: none; }
+
+.reticle {
+  width: 44px; height: 44px; margin-left: -22px; margin-top: -22px;
+  border: 2px solid rgba(120, 210, 255, 0.9); border-radius: 50%;
+  box-shadow: 0 0 14px rgba(120, 210, 255, 0.6), inset 0 0 8px rgba(120, 210, 255, 0.35);
+}
+.reticle::before, .reticle::after { content: ""; position: absolute; left: 50%; width: 2px; height: 9px; margin-left: -1px; background: rgba(120, 210, 255, 0.9); }
+.reticle::before { top: -10px; }
+.reticle::after { bottom: -10px; }
+
+.boresight {
+  left: 50%; top: 50%; width: 12px; height: 12px; transform: translate(-50%, -50%);
+  border: 2px solid rgba(255, 255, 255, 0.55); border-radius: 50%;
+}
+.boresight::before, .boresight::after { content: ""; position: absolute; top: 50%; height: 2px; width: 15px; margin-top: -1px; background: rgba(255, 255, 255, 0.55); }
+.boresight::before { left: -19px; }
+.boresight::after { right: -19px; }
+
+/* ----------------------------------------------------------------------------
+   Homepage control-mode selector
+---------------------------------------------------------------------------- */
+.modeseg { margin-top: 22px; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.seg-label { font-size: 10px; letter-spacing: 2.5px; text-transform: uppercase; opacity: 0.55; font-weight: 700; }
+.seg {
+  pointer-events: auto; cursor: pointer; font-size: 13px; font-weight: 600; letter-spacing: 0.3px;
+  color: rgba(235, 244, 255, 0.85); padding: 11px 16px; border-radius: 12px; width: min(430px, 82vw);
+  background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.14); transition: all 0.18s ease;
+}
+.seg:hover { background: rgba(255, 255, 255, 0.1); transform: translateY(-1px); }
+.seg.active {
+  background: linear-gradient(135deg, rgba(120, 210, 255, 0.26), rgba(180, 140, 255, 0.26));
+  border-color: rgba(120, 210, 255, 0.5); box-shadow: 0 4px 18px rgba(120, 210, 255, 0.22); color: #fff;
+}
+

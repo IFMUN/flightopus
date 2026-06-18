@@ -41,7 +41,18 @@ export class Weather {
     this.onStrike = null
     this.target = null
     this._boltT = 0
-    this._boltMat = new THREE.MeshBasicMaterial({ color: 0xcfe6ff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })
+    this._boltDur = 0.5
+    this._boltMeshes = []
+    // bright blue-white core shared by all bolt segments
+    this._boltMat = new THREE.MeshBasicMaterial({ color: 0xeaf3ff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })
+    // additive impact flash sprite at the plane
+    this._impactMat = new THREE.SpriteMaterial({ color: 0xcfe6ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })
+    this._impact = new THREE.Sprite(this._impactMat)
+    this._impact.visible = false
+    this.scene.add(this._impact)
+    // flicker schedule (fractions of bolt life at which to re-flash env)
+    this._flickerSeq = [0.1, 0.2, 0.32, 0.46, 0.64]
+    this._flickerIdx = 0
     this.setWeather(CONFIG.initialWeather || 'clear')
   }
 
@@ -115,33 +126,89 @@ export class Weather {
     }
     if (this._boltT > 0) {
       this._boltT -= dt
-      if (this._boltMesh) this._boltMesh.material.opacity = Math.max(0, this._boltT / 0.16) * 0.95
-      if (this._boltT <= 0 && this._boltMesh) { this.scene.remove(this._boltMesh); this._boltMesh.geometry.dispose(); this._boltMesh = null }
+      const life = Math.max(0, this._boltT / this._boltDur) // 1 -> 0
+      const age = 1 - life // 0 -> 1
+
+      // flicker: re-flash the environment a few times across the bolt's life
+      while (this._flickerIdx < this._flickerSeq.length && age >= this._flickerSeq[this._flickerIdx]) {
+        this.env.flash(1.15 - this._flickerIdx * 0.16)
+        this._flickerIdx++
+      }
+      // strobing brightness — a few on/off blinks plus an overall decay
+      const strobe = 0.2 + 0.8 * (0.5 + 0.5 * Math.sin(age * Math.PI * 14))
+      this._boltMat.opacity = life * strobe
+
+      // impact flash pops at the plane then fades fast
+      const ip = Math.max(0, 1 - age * 2.4)
+      this._impactMat.opacity = ip * 0.9
+      this._impact.scale.setScalar(60 + (1 - ip) * 140)
+
+      if (this._boltT <= 0) this._clearBolt()
     }
+  }
+
+  _clearBolt () {
+    for (const m of this._boltMeshes) { this.scene.remove(m); m.geometry.dispose() }
+    this._boltMeshes.length = 0
+    this._impact.visible = false
+    this._impactMat.opacity = 0
+  }
+
+  // build one jagged tube between two points; segs/jit control roughness
+  _boltSegment (from, to, jit, radius, droop = 0) {
+    const n = 9
+    const pts = []
+    for (let i = 0; i <= n; i++) {
+      const f = i / n
+      const taper = (i > 0 && i < n) ? Math.sin(f * Math.PI) : 0
+      pts.push(new THREE.Vector3(
+        THREE.MathUtils.lerp(from.x, to.x, f) + (Math.random() - 0.5) * jit * taper,
+        THREE.MathUtils.lerp(from.y, to.y, f) + (Math.random() - 0.5) * jit * taper - droop * f * f,
+        THREE.MathUtils.lerp(from.z, to.z, f) + (Math.random() - 0.5) * jit * taper))
+    }
+    const curve = new THREE.CatmullRomCurve3(pts)
+    const geo = new THREE.TubeGeometry(curve, 40, radius, 5, false)
+    const mesh = new THREE.Mesh(geo, this._boltMat)
+    mesh.frustumCulled = false
+    this.scene.add(mesh)
+    this._boltMeshes.push(mesh)
+    return pts
   }
 
   _strikePlane () {
     const p = this.target.pos
-    const n = 11
-    const pts = []
-    const topx = p.x + (Math.random() - 0.5) * 220
-    const topz = p.z + (Math.random() - 0.5) * 220
-    for (let i = 0; i <= n; i++) {
-      const f = i / n
-      const jit = (i > 0 && i < n) ? (1 - f) * 130 : 0
-      pts.push(new THREE.Vector3(
-        THREE.MathUtils.lerp(topx, p.x, f) + (Math.random() - 0.5) * jit,
-        THREE.MathUtils.lerp(p.y + 1600, p.y, f),
-        THREE.MathUtils.lerp(topz, p.z, f) + (Math.random() - 0.5) * jit))
+    this._clearBolt()
+
+    const top = new THREE.Vector3(
+      p.x + (Math.random() - 0.5) * 240,
+      p.y + 1600,
+      p.z + (Math.random() - 0.5) * 240)
+    const plane = new THREE.Vector3(p.x, p.y, p.z)
+
+    // main jagged bolt: sky -> plane (thick bright core)
+    const spine = this._boltSegment(top, plane, 130, 3.0)
+
+    // 2-4 shorter forks peeling off the upper/mid spine, hanging downward
+    const forks = 2 + Math.floor(Math.random() * 3)
+    for (let k = 0; k < forks; k++) {
+      const a = spine[1 + Math.floor(Math.random() * (spine.length - 3))]
+      const len = 180 + Math.random() * 320
+      const end = new THREE.Vector3(
+        a.x + (Math.random() - 0.5) * 260,
+        a.y - len,
+        a.z + (Math.random() - 0.5) * 260)
+      this._boltSegment(a, end, 70, 1.6, 30)
     }
-    if (this._boltMesh) { this.scene.remove(this._boltMesh); this._boltMesh.geometry.dispose() }
-    const curve = new THREE.CatmullRomCurve3(pts)
-    const geo = new THREE.TubeGeometry(curve, 44, 2.6, 6, false)
-    this._boltMesh = new THREE.Mesh(geo, this._boltMat)
-    this._boltMesh.frustumCulled = false
-    this.scene.add(this._boltMesh)
-    this._boltT = 0.16
-    this.env.flash(1.5)
+
+    // impact flash at the plane
+    this._impact.position.copy(plane)
+    this._impact.scale.setScalar(60)
+    this._impactMat.opacity = 0.9
+    this._impact.visible = true
+
+    this._boltT = this._boltDur
+    this._flickerIdx = 0
+    this.env.flash(1.6)
     this.onStrike?.()
   }
 

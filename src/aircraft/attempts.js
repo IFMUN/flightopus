@@ -6,7 +6,7 @@
 import * as THREE from 'three'
 import { Boeing737 } from './boeing737.js'
 import { FlightModel } from './flightmodel.js'
-import { FireSmoke, makeBlobShadow } from './effects.js'
+import { FireSmoke, Explosion, makeBlobShadow } from './effects.js'
 
 const MAX_PAST = 5
 const TRAIL_MAX = 900
@@ -17,6 +17,7 @@ export class Attempts {
     this.hf = hf
     this.past = []
     this.fires = []
+    this.explosions = []
     this.count = 0
     this.spawnState = null
 
@@ -92,6 +93,10 @@ export class Attempts {
     }
 
     for (const f of this.fires) f.update(dt, t, wind)
+    // one-shot crash explosions: update + dispose when finished
+    for (let i = this.explosions.length - 1; i >= 0; i--) {
+      if (!this.explosions[i].update(dt)) { this.explosions[i].dispose(); this.explosions.splice(i, 1) }
+    }
     return ev
   }
 
@@ -100,6 +105,8 @@ export class Attempts {
     this.scene.add(f.group)
     this.fires.push(f)
     this._pendingFire = f
+    // punchy one-shot blast on top of the persistent wreck fire
+    this.explosions.push(new Explosion(this.scene, pos.clone(), { scale: scale * 1.1 }))
   }
 
   // Finalize current run and spawn a fresh aircraft at the original spawn.

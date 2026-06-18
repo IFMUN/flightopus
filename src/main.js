@@ -57,7 +57,7 @@ async function boot () {
   })
 
   // ---- homepage (shows immediately, reports loading progress) ----
-  const home = new Homepage(document.getElementById('home'), { onEnter: () => startGameplay() })
+  const home = new Homepage(document.getElementById('home'), { onEnter: () => startGameplay(home.controlMode) })
   if (CONFIG.skipIntro) document.getElementById('home').style.display = 'none'
   const prog = (p, t) => { if (!CONFIG.skipIntro) home.progress(p, t) }
 
@@ -120,6 +120,7 @@ async function boot () {
   let timeIdx = TIME_ORDER.indexOf(env.timeName); if (timeIdx < 0) timeIdx = 2
   let gearAnim = 0
   let started = false
+  const lastAtt = { bank: 0, pitch: 0 } // fed to cursor steering (1-frame lag, fine)
   app.paused = false
 
   const controls = new Controls({
@@ -129,6 +130,7 @@ async function boot () {
     onWeather: () => hud.setWeather(weather.cycle()),
     onHelp: () => hud.toggleHelp(),
     onPause: () => { app.paused = !app.paused; hud.toast(app.paused ? 'Paused' : 'Resumed', '', '') },
+    onMode: () => { const m = controls.toggleMode(); hud.setControlMode(m); hud.toast(m === 'cursor' ? 'Cursor steering' : 'Keyboard controls', m === 'cursor' ? 'Point where you want to fly' : 'WASD / arrows + Q/E', '') },
     onNewAttempt: () => newAttempt()
   })
   app.controls = controls
@@ -163,10 +165,11 @@ async function boot () {
   }
 
   // ---- intro / start ----
-  function startGameplay () {
+  function startGameplay (mode) {
     if (started) return
     started = true
     controls.enabled = true
+    hud.setControlMode(controls.setMode(mode || 'keyboard'))
     hud.show()
     hud.setTime(TIME_PRESETS[env.timeName].label)
     hud.setWeather(weather.preset.label)
@@ -190,7 +193,7 @@ async function boot () {
     if (!partSmokes.has(part)) partSmokes.set(part, new TrailSmoke(scene, { color: 0x151515 }))
     hud.toast('⚡ LIGHTNING STRIKE', part + ' damaged', 'danger')
   }
-  if (CONFIG.skipIntro && !spectator) startGameplay()
+  if (CONFIG.skipIntro && !spectator) startGameplay(params.get('control') || 'keyboard')
   if (!CONFIG.skipIntro) { home.ready() }
 
   // ---- main loop ----
@@ -206,7 +209,7 @@ async function boot () {
       runSpectator(t)
       attempts.plane.update(dt, t)
     } else if (started && !app.paused) {
-      controls.update(dt)
+      controls.update(dt, lastAtt)
       const input = controls.input
       const wind = weather.getWind(attempts.fm.pos, t)
       const ev = attempts.update(dt, t, input, wind)
@@ -224,15 +227,16 @@ async function boot () {
       cameras.update(dt, attempts.fm)
 
       const T = attempts.fm.telemetry()
+      lastAtt.bank = T.bank; lastAtt.pitch = T.pitch
       hud.update(T, input, { flapNotch: controls.flapNotch, gearMoving: Math.abs((input.gearDown ? 1 : 0) - gearAnim) > 0.02 })
       hud.setWind(weather.windSpeed() * 1.94384)
 
-      // battle-damage visuals: scorch parts, fill the schematic, trail smoke
+      // battle-damage visuals: scorch parts, fill the schematic, trail fire+smoke
       damageUI.setDamage(attempts.fm.damage, T.overallDamage)
       if (T.overallDamage > 0.001) {
         const dmg = attempts.fm.damage
         if (p.setPartDamage) for (const k in dmg) p.setPartDamage(k, dmg[k])
-        if (p.parts) for (const [part, smoke] of partSmokes) { const loc = p.parts[part]; if (loc) smoke.update(dt, loc.getWorldPosition(tmpV3), wind) }
+        if (p.parts) for (const [part, smoke] of partSmokes) { const loc = p.parts[part]; if (loc) smoke.update(dt, loc.getWorldPosition(tmpV3), wind, dmg[part]) }
       }
 
       if (DEBUG && (telT += dt) > 0.5) {

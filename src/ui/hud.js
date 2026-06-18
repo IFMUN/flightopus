@@ -18,6 +18,7 @@ export class HUD {
           <div class="cluster" style="margin-top:8px;flex-wrap:wrap;gap:8px">
             <span class="chip"><span class="dot"></span><b id="h-time">Golden</b></span>
             <span class="chip"><span class="dot"></span><b id="h-wx">Clear</b></span>
+            <span class="chip" id="h-mode" title="Press M to switch">🖱 <b>Cursor</b></span>
           </div>
           <div class="sub" style="margin-top:8px">Attempt <b id="h-attempt">1</b> · <span id="h-wind">wind 3 kt</span></div>
         </div>
@@ -78,8 +79,22 @@ export class HUD {
       gear: $('h-gear'), brake: $('h-brake'), spoiler: $('h-spoiler'),
       ias: $('h-ias'), mach: $('h-mach'), agl: $('h-agl'), msl: $('h-msl'), vs: $('h-vs'), aoa: $('h-aoa'),
       hdg: $('h-hdg'), pitch: $('h-pitch'), bank: $('h-bank'), g: $('h-g'), stall: $('h-stall'),
-      cam: $('h-cam'), toast: $('h-toast'), help: $('h-help')
+      cam: $('h-cam'), toast: $('h-toast'), help: $('h-help'), mode: $('h-mode')
     }
+
+    // cursor-steering reticle + fixed boresight (shown only in cursor mode)
+    this.reticle = document.createElement('div'); this.reticle.className = 'reticle'
+    this.boresight = document.createElement('div'); this.boresight.className = 'boresight'
+    this.root.append(this.reticle, this.boresight)
+    window.addEventListener('mousemove', e => {
+      this.reticle.style.left = e.clientX + 'px'
+      this.reticle.style.top = e.clientY + 'px'
+    })
+  }
+
+  setControlMode (m) {
+    this.el.mode.innerHTML = m === 'cursor' ? '🖱 <b>Cursor</b>' : '⌨ <b>Keyboard</b>'
+    document.body.classList.toggle('cursor-steer', m === 'cursor')
   }
 
   show () { this.root.classList.remove('hidden'); requestAnimationFrame(() => this.root.classList.add('show')) }

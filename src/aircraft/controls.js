@@ -3,10 +3,12 @@
 // fire callbacks.
 
 export const KEYMAP = [
-  ['W / ↑', 'Pitch up (climb)'],
-  ['S / ↓', 'Pitch down (dive)'],
-  ['A / ←', 'Roll left'],
-  ['D / →', 'Roll right'],
+  ['Mouse', 'Steer toward cursor (Cursor mode)'],
+  ['M', 'Switch Keyboard / Cursor'],
+  ['W / ↑', 'Pitch up (climb) — Keyboard'],
+  ['S / ↓', 'Pitch down (dive) — Keyboard'],
+  ['A / ←', 'Roll left — Keyboard'],
+  ['D / →', 'Roll right — Keyboard'],
   ['Q  E', 'Rudder yaw L / R'],
   ['Shift', 'Throttle up'],
   ['Ctrl', 'Throttle down'],
@@ -31,12 +33,22 @@ export class Controls {
     this.input = { pitch: 0, roll: 0, yaw: 0, throttle: 0.0, flaps: 0, gearDown: true, brake: false, spoiler: false }
     this._flapNotch = 0
     this.enabled = false
+    this.mode = 'keyboard'           // 'keyboard' | 'cursor'
+    this.mouse = { x: 0, y: 0 }       // normalised device coords, (0,0) = centre
 
     this._down = e => this._onDown(e)
     this._up = e => this._onUp(e)
+    this._move = e => {
+      this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1
+      this.mouse.y = (e.clientY / window.innerHeight) * 2 - 1
+    }
     window.addEventListener('keydown', this._down)
     window.addEventListener('keyup', this._up)
+    window.addEventListener('mousemove', this._move)
   }
+
+  setMode (m) { this.mode = m === 'cursor' ? 'cursor' : 'keyboard'; return this.mode }
+  toggleMode () { return this.setMode(this.mode === 'cursor' ? 'keyboard' : 'cursor') }
 
   _code (e) {
     const k = e.key
@@ -66,37 +78,56 @@ export class Controls {
       case 'y': this.h.onWeather?.(); break
       case 'h': this.h.onHelp?.(); break
       case 'p': this.h.onPause?.(); break
+      case 'm': this.h.onMode?.(); break
       case 'space': case 'enter': this.h.onNewAttempt?.(); break
     }
   }
 
   _onUp (e) { this.keys.delete(this._code(e)) }
 
-  update (dt) {
+  // att (optional) = { bank, pitch } in degrees, used by cursor steering.
+  update (dt, att = null) {
     const k = this.keys
-    const ax = (pos, neg, rate = 3.6) => {
-      const target = (k.has(pos) ? 1 : 0) - (k.has(neg) ? 1 : 0)
-      return target
-    }
-    // smoothed axes
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
     const approach = (cur, target, rate) => {
       const d = target - cur
       const step = rate * dt
       return Math.abs(d) <= step ? target : cur + Math.sign(d) * step
     }
-    const pT = (k.has('w') || k.has('up') ? 1 : 0) - (k.has('s') || k.has('down') ? 1 : 0)
-    const rT = (k.has('d') || k.has('right') ? 1 : 0) - (k.has('a') || k.has('left') ? 1 : 0)
-    const yT = (k.has('e') ? 1 : 0) - (k.has('q') ? 1 : 0)
-    this.input.pitch = approach(this.input.pitch, pT, 3.2)
-    this.input.roll = approach(this.input.roll, rT, 4.0)
-    this.input.yaw = approach(this.input.yaw, yT, 4.0)
 
+    // throttle / flaps / brakes / spoilers — same in both modes
     if (k.has('shift')) this.input.throttle = Math.min(1, this.input.throttle + dt * 0.45)
     if (k.has('ctrl')) this.input.throttle = Math.max(0, this.input.throttle - dt * 0.5)
-
     this.input.flaps += (FLAP_DETENTS[this._flapNotch] - this.input.flaps) * Math.min(1, dt * 1.5)
     this.input.brake = k.has('b')
     this.input.spoiler = k.has('x')
+    const yKey = (k.has('e') ? 1 : 0) - (k.has('q') ? 1 : 0)
+
+    if (this.mode === 'cursor') {
+      // cursor offset from centre -> commanded bank / pitch; a proportional
+      // controller flies the jet toward that attitude (self-limiting & easy).
+      const dz = v => { const s = Math.sign(v), a = Math.abs(v); if (a < 0.045) return 0; const tt = (a - 0.045) / 0.955; return s * Math.min(1, 0.28 * tt + 0.95 * tt * tt) }
+      const cmdBank = dz(this.mouse.x) * 55      // degrees
+      const cmdPitch = dz(-this.mouse.y) * 22    // degrees
+      if (att) {
+        const rollT = clamp((cmdBank - att.bank) * 0.05, -1, 1)
+        const pitchT = clamp((cmdPitch - att.pitch) * 0.07, -1, 1)
+        const yawT = clamp(yKey + (cmdBank / 55) * 0.25, -1, 1)   // coordinated turn
+        this.input.roll = approach(this.input.roll, rollT, 5)
+        this.input.pitch = approach(this.input.pitch, pitchT, 5)
+        this.input.yaw = approach(this.input.yaw, yawT, 4)
+      } else {
+        this.input.roll = approach(this.input.roll, dz(this.mouse.x), 4)
+        this.input.pitch = approach(this.input.pitch, dz(-this.mouse.y), 4)
+        this.input.yaw = approach(this.input.yaw, yKey, 4)
+      }
+    } else {
+      const pT = (k.has('w') || k.has('up') ? 1 : 0) - (k.has('s') || k.has('down') ? 1 : 0)
+      const rT = (k.has('d') || k.has('right') ? 1 : 0) - (k.has('a') || k.has('left') ? 1 : 0)
+      this.input.pitch = approach(this.input.pitch, pT, 3.2)
+      this.input.roll = approach(this.input.roll, rT, 4.0)
+      this.input.yaw = approach(this.input.yaw, yKey, 4.0)
+    }
   }
 
   setThrottle (v) { this.input.throttle = v }

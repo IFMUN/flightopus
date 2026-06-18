@@ -46,8 +46,12 @@ behind you for the next attempt.
 
 ## Controls
 
+Pick **Cursor** (easy — the jet flies toward your cursor) or **Keyboard** on the
+homepage, or press `M` to switch any time.
+
 | Key | Action | Key | Action |
 | --- | --- | --- | --- |
+| **Mouse** | **Cursor mode: steer toward the reticle** | `M` | Switch cursor / keyboard |
 | `W` / `↑` | Pitch up (climb) | `G` | Landing gear up / down |
 | `S` / `↓` | Pitch down (dive) | `F` / `R` | Flaps extend / retract |
 | `A` / `←` | Roll left | `X` | Spoilers / airbrake (hold) |
